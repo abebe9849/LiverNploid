@@ -19,18 +19,7 @@ from sklearn.linear_model import LogisticRegressionCV
 from sklearn.linear_model import LogisticRegression
 
 DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-13/resnet50d_all"
-DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-13/densenet121_all"
-DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-12/b0_aug_select"
-DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-12/HIPT_unfreeze1_aug_select"
-DIR = "/home/abebe9849/Nploid/src/outputs/SAVE3/b0_aug"
-#DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-12/HIPT_unfreeze2_aug_select"
-#DIR = "/home/abebe9849/Nploid/src/outputs/2023-01-07/b0_aug"
-DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-10/b0_aug_all"
-#DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-13/densenet121_all"
 
-#DIR = "/home/abebe9849/Nploid/src/outputs/2023-01-08/HIPT_unfreeze2_aug"
-#DIR = "/home/abebe9849/Nploid/src/outputs/2023-02-12/15-10-30"
-#DIR = "/home/abebe9849/Nploid/src/outputs/2023-02-12/HIPT_unfreeze2_aug_select"
 
 
 DIR_s = ["/home/abebe9849/Nploid/src/outputs/2023-03-10/b0_aug_all",
@@ -47,11 +36,6 @@ DIR_s = ["/home/abebe9849/Nploid/src/outputs/2023-03-10/b0_aug_all",
          "/home/abebe9849/Nploid/src/outputs/2023-02-28/densenet121_select",
          "/home/abebe9849/Nploid/src/outputs/2023-02-28/resnet50d_select",
          ]
-
-
-
-
-#oof = cross_validation_with_platt_scaling(oof) #この後y_indexとかとるとp値悪くなる
 
 
 def test_func(df,test,oof,fold):
@@ -113,21 +97,12 @@ def test_func(df,test,oof,fold):
 
 
     Y_index = result['x'].item()
-    # y_trueは真のクラスラベル、y_scoreは確率推定値
     fpr, tpr, thresholds = roc_curve(true_y, pred_y)
-    # 左上隅との距離を計算する
     distances = np.sqrt(fpr**2 + (tpr-1)**2)
-    # 最小距離のインデックスを取得する
     min_index = np.argmin(distances)
-    # 最小距離に対応する閾値を取得する
     optimal_threshold = thresholds[min_index]
     print(optimal_threshold)
     
-    
-    
-    
-
-
     def plot_KM(type,TH):
         high = df[df["pred"]>=TH]
         low = df[df["pred"]<TH]
@@ -210,16 +185,8 @@ def cross_validation_with_platt_scaling(oof_df,test_df,df_tmp):
     return new_oof
 
 
-#cross_validation_with_platt_scaling(oof,test_df,df_clinical)
-
-#test_func(df,test,oof,"original")
-
 DIR_s = [
-        #"/home/abebe9849/Nploid/src/outputs/2023-05-06/do_cutmix",
-         #"/home/abebe9849/Nploid/src/outputs/2023-05-10/contrast_limit075",
-         #"/home/abebe9849/Nploid/src/outputs/2023-05-10/cont05_cutmix"
-         "/home/abebe9849/Nploid/src/outputs/2023-06-06/HIPT_unfreeze2_aug_cont075",
-         "/home/abebe9849/Nploid/src/outputs/2023-06-06/HIPT_unfreeze2_aug_cmix",
+         "/home/abebe9849/Nploid/src/outputs/2023-06-06/HIPT_unfreeze2",
 
          ]
 for DIR in DIR_s:
@@ -232,13 +199,9 @@ for DIR in DIR_s:
         print(e)
         test_df =pd.read_csv(f"{DIR}/test_wo_duplicate.csv")
         oof = pd.read_csv(glob.glob(f"{DIR}/*oof*csv")[0])
-        
-    #test_df["pred"]=(test_df["pred_fold0"]+test_df["pred_fold1"]+test_df["pred_fold2"]+test_df["pred_fold3"]+test_df["pred_fold4"])/5
+    df_clinical = pd.read_csv("clinical_data.csv")
 
-
-    df_clinical = pd.read_csv("/home/abebe9849/Nploid/新岡先生共有_臨床情報_松浦追記_20230131.csv")
-
-    test170 = pd.read_csv("/home/abebe9849/Nploid/20230220_AI176例データ_ver01.csv")
+    test170 = pd.read_csv("test_clinical_data.csv")
     def func(x):
         return x.replace("HL","AI")
     test170["AI No."] = test170["Pt No."].apply(func)
