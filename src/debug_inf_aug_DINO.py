@@ -67,16 +67,6 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, idx):
         image_id = self.image_ids[idx]
-        """
-        if "AI017" in image_id or "AI053" in image_id:
-            image_id = "/data/RSNA/Nploid/HE_for_AI_SmallTIFF/HE_for_AI_SmallTIFF/" +"OLD"+ image_id.split("HE_for_AI_SmallTIFF")[-1]
-            imgs = glob.glob(f"{image_id}*tif")
-        elif "AI020" in image_id or "AI023" in image_id:
-            image_id = "/data/RSNA/Nploid/HE_for_AI_SmallTIFF/HE_for_AI_SmallTIFF/" +"mismatch"+ image_id.split("HE_for_AI_SmallTIFF")[-1]
-            imgs = glob.glob(f"{image_id}*tif")
-        else:
-            imgs = glob.glob(f"{image_id}*tif")
-        """
         imgs = glob.glob(f"{image_id}*tif")
         imgs =  np.stack([self.transform(image=cv2.imread(img)[:,:,::-1])['image']  for img in imgs])
         image = torch.from_numpy(imgs.transpose(0,3,1,2)).float()
@@ -138,10 +128,6 @@ class TestDataset(Dataset):
 def get_transforms(*, data,CFG):
     if data == 'train':
         return Compose([
-            #Resize(CFG.preprocess.size,CFG.preprocess.size),
-            #A.augmentations.crops.transforms.CenterCrop(CFG.preprocess.size*0.9,CFG.preprocess.size*0.9),
-            #A.crops.transforms.RandomResizedCrop(CFG.preprocess.size,CFG.preprocess.size),
-            #A.crops.transforms.RandomCrop(CFG.preprocess.size,CFG.preprocess.size),
             A.HorizontalFlip(p=CFG.aug.HorizontalFlip.p),
             A.VerticalFlip(p=CFG.aug.VerticalFlip.p),
             A.RandomRotate90(p=CFG.aug.RandomRotate90.p),
@@ -168,8 +154,6 @@ def get_transforms(*, data,CFG):
             ])
     elif data == 'valid':
         return Compose([
-            #Resize(CFG.preprocess.size,CFG.preprocess.size),
-            #A.augmentations.crops.transforms.CenterCrop(int(CFG.preprocess.size*0.9),int(CFG.preprocess.size*0.9)),
             Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
             ])
 
@@ -238,8 +222,6 @@ class Model_HIPT(nn.Module):
         embeds, _ = self.gru(x.view(batch_size,n,x.shape[1]))
         embeds = self.pool(embeds.permute(0,2,1))[:,:,0]
         y = self.exam_predictor(embeds)
-        #x = x.view(batch_size,x.shape[1]*n)
-        #y = self.head(x)
         
         return y
 class Model_HIPT(nn.Module):
@@ -313,205 +295,9 @@ class Model_HIPT(nn.Module):
         x = torch.cat([x[:, 0] for x in intermediate_output], dim=-1)
         embeds, _ = self.gru(x.view(batch_size,n,x.shape[1]))
         embeds = self.pool(embeds.permute(0,2,1))[:,:,0]
-        y = self.exam_predictor(embeds)
-        #x = x.view(batch_size,x.shape[1]*n)
-        #y = self.head(x)
-        
+        y = self.exam_predictor(embeds)        
         return y,embeds
 
-
-#model = Model_iafoss("dino_vit_s")
-
-
-#### model ================
-
-
-def train_fn(CFG,fold,folds,test_pl=0):
-
-    #nvnn_transform = A.load("/home/u094724e/NIH/siim2021_nvnn/pipeline1/configs/aug/s_0220/0220_hf_cut_sm2_0.75_384_v1.yaml", data_format='yaml')
-
-    torch.cuda.set_device(CFG.general.device)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"### fold: {fold} ###")
-    trn_idx = folds[folds['fold'] != fold].index
-    val_idx = folds[folds['fold'] == fold].index
-    val_folds = folds.loc[val_idx].reset_index(drop=True)
-    tra_folds = folds.loc[trn_idx]
-    if type(test_pl)!=type(0):
-        tra_folds = pd.concat([tra_folds,test_pl]).reset_index(drop=True)
-    train_dataset = TrainDataset(tra_folds,train=True, 
-                                 transform1=get_transforms(data='train',CFG=CFG),CFG=CFG)#get_transforms(data='train',CFG=CFG)
-    valid_dataset = TrainDataset(val_folds,train=False,
-                                 transform1=get_transforms(data='valid',CFG=CFG),CFG=CFG)#
-
-
-
-    train_loader = DataLoader(train_dataset, batch_size=CFG.train.batch_size, shuffle=True, num_workers=8,pin_memory=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=CFG.train.batch_size, shuffle=False, num_workers=8,pin_memory=True)
-
-    ###  model select ============
-    model = Model_iafoss(base_model=CFG.model.name).to(device)
-    # ============
-
-
-    ###  optim select ============
-    if CFG.train.optim=="adam":
-        optimizer = Adam(model.parameters(), lr=CFG.train.lr, amsgrad=False)
-    elif CFG.train.optim=="adamw":
-        optimizer = AdamW(model.parameters(), lr=CFG.train.lr,weight_decay=5e-5)
-    # ============
-
-    ###  scheduler select ============
-    if CFG.train.scheduler.name=="cosine":
-        scheduler = CosineAnnealingLR(optimizer, T_max=CFG.train.epochs, eta_min=CFG.train.scheduler.min_lr)
-    elif CFG.train.scheduler.name=="cosine_warmup":
-        scheduler =T.get_cosine_schedule_with_warmup(optimizer,
-        num_warmup_steps=len(train_loader)*CFG.train.scheduler.warmup,
-        num_training_steps=len(train_loader)*CFG.train.epochs)
-
-    # ============
-
-    ###  loss select ============
-    criterion=nn.BCEWithLogitsLoss()
-    print(criterion)
-    ###  loss select ============
-
-    sigmoid = nn.Sigmoid()
-    scaler = torch.cuda.amp.GradScaler()
-    best_score = 0
-    best_loss = np.inf
-    best_preds = None
-        
-    for epoch in range(CFG.train.epochs):
-        start_time = time.time()
-        model.train()
-        avg_loss = 0.
-
-        tk0 = tqdm(enumerate(train_loader), total=len(train_loader))
-
-        for i, (images, labels) in tk0:
-            optimizer.zero_grad()
-            images = images.to(device)
-            labels = labels.to(device)
-            
-
-            ### mix系のaugumentation=========
-            rand = np.random.rand()
-            ##mixupを終盤のepochでとめる
-            if epoch+1 >=CFG.train.without_hesitate:
-                rand=1
-
-            if CFG.augmentation.mix_p>rand and CFG.augmentation.do_mixup:
-                images, y_a, y_b, lam = mixup_data(images, labels,alpha=CFG.augmentation.mix_alpha)
-            elif CFG.augmentation.mix_p>rand and CFG.augmentation.do_cutmix:
-                images, y_a, y_b, lam = cutmix_data(images, labels,alpha=CFG.augmentation.mix_alpha)
-            elif CFG.augmentation.mix_p>rand and CFG.augmentation.do_resizemix:
-                images, y_a, y_b, lam = resizemix_data(images, labels,alpha=CFG.augmentation.mix_alpha)
-            elif CFG.augmentation.mix_p>rand and CFG.augmentation.do_fmix:
-                images, y_a, y_b, lam = fmix_data(images, labels,alpha=CFG.augmentation.mix_alpha)
-            ### mix系のaugumentation おわり=========
-
-            if CFG.train.amp:
-                with autocast():
-                    y_preds = model(images)
-                    if CFG.augmentation.mix_p>rand:
-                        loss_ = mixup_criterion(criterion, y_preds, y_a.view(-1,1), y_b.view(-1,1), lam)
-                    else:
-                        loss_ = criterion(y_preds,labels.view(-1,1))
-
-                    loss=loss_
-
-                scaler.scale(loss).backward()
-
-                if (i+1)%CFG.train.ga_accum==0 or i==-1:
-                    scaler.step(optimizer)
-                    scaler.update()
-
-                        
-                    if CFG.train.scheduler.name=="cosine_warmup":
-                        scheduler.step()
-
-       
-
-            if CFG.train.scheduler.name=="cosine":
-                scheduler.step()
-
-
-            avg_loss += loss.item() / len(train_loader)
-        model.eval()
-        avg_val_loss = 0.
-        LOGITS = []
-        valid_labels = []
-        tk1 = tqdm(enumerate(valid_loader), total=len(valid_loader))
-
-        for i, (images, labels) in tk1:
-            images = images.to(device)
-            labels = labels.to(device)
-            with torch.no_grad():
-                with autocast():
-                    logits = model(images)
-                    loss =  criterion(logits,labels.view(-1,1))
-
-            valid_labels.append(labels)
-            LOGITS.append(logits.detach())
-            avg_val_loss += loss.item() / len(valid_loader)
-        preds = torch.sigmoid(torch.cat(LOGITS)).cpu().numpy().squeeze() 
-        valid_labels = torch.cat(valid_labels).cpu().numpy()
-
-        print(preds.shape,valid_labels.shape)
-        print(valid_labels.mean(axis=0))
-
-        #each_auc,score =AUC(true=valid_labels,predict=preds)
-        AUC_score = roc_auc_score(valid_labels, preds)
-
-
-        elapsed = time.time() - start_time
-        log.info(f"AUC_score  {AUC_score}")
-
-
-        log.info(f'  Epoch {epoch+1} - avg_train_loss: {avg_loss:.6f}  avg_val_loss: {avg_val_loss:.6f}  time: {elapsed:.0f}s')
-
-        if best_loss>avg_val_loss:#pr_auc best
-            best_loss = avg_val_loss
-            log.info(f'  Epoch {epoch+1} - Save Best loss: {best_loss:.4f}')
-            torch.save(model.state_dict(), f'fold{fold}_{CFG.general.exp_num}_best_loss.pth')
-
-        if AUC_score>best_score:#pr_auc best
-            best_score = AUC_score
-            log.info(f'  Epoch {epoch+1} - Save Best AUC: {best_score:.4f}')
-            best_preds = preds
-            torch.save(model.state_dict(), f'fold{fold}_{CFG.general.exp_num}_best_AUC.pth')
-
-        val_folds["pred"]=best_preds
-
-    return best_preds, valid_labels,val_folds
-
-
-
-def inf_func__(models, valid_loader, device):
-    #models = [m for m in models]
-    for model in models:
-        model.eval()
-
-    preds = []
-
-    tk1 = tqdm(enumerate(valid_loader), total=len(valid_loader))
-
-    for i, images in tk1:
-        images = images.to(device,non_blocking=True)
-        #print(images.shape)
-        if i==10:s = time.time()
-        elif i==20:print(time.time()-s)
-        with torch.no_grad():
-            with autocast():
-                y_preds = [m(images.float()).sigmoid() for m  in models]
-                #print(y_preds)
-                y_preds  = torch.stack(y_preds).mean(0)
-
-        preds.append(y_preds)
-    preds = torch.cat(preds).to('cpu').numpy()
-
-    return preds
 
 
 def inf_func(models, valid_loader, device):
@@ -593,29 +379,6 @@ def submit(CFG,test,DIR):
     return test,embs
     
     
-
-def submit_folds(CFG,folds,DIR):
-    torch.cuda.set_device(CFG.general.device)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    oof = pd.DataFrame()
-    for i in   range(5):
-        model = Model_HIPT(base_model="dino_vit_s",freeze=1).to(device)
-        #if i==3:continue #AI049
-        #model.load_state_dict(torch.load(f"{DIR}/fold{i}__HIPT_best_AUC.pth", map_location="cpu",strict=False))
-        model.load_state_dict(torch.load(f"{DIR}/fold{i}_{CFG.general.exp_num}__HIPT_best_AUC.p.pth", map_location="cpu",strict=False))
-
-        
-        val_folds = folds[folds['fold'] == i].reset_index(drop=True)
-        valid_dataset = TestDataset(val_folds,train=False,
-                                 transform1=get_transforms(data='valid',CFG=CFG),CFG=CFG)# 
-        valid_loader = DataLoader(valid_dataset, batch_size=8, shuffle=False, num_workers=12,pin_memory=True)
-        test_preds = val_func(model, valid_loader, device)
-    
-        val_folds["pred"]=test_preds
-        oof = pd.concat([oof,val_folds])
-    
-    return oof
         
         
 def submit_folds(CFG,folds,DIR):
@@ -659,26 +422,6 @@ def func(x):
     return "AI"+x
 df["WSI_ID"]= np.vectorize(func)(df["file_path"])
 
-
-
-
-"""
-df = pd.DataFrame()
-df["file_path"]=glob.glob("/data/RSNA/Nploid/extra5/*/*")
-def func(x):
-    x = x.split("/")[-2]
-    return x
-df["patient"]= np.vectorize(func)(df["file_path"])
-"""
-
-
-
-#df  = pd.read_csv("/home/abebe9849/Nploid/src/outputs/2022-12-16/23-06-02/test.csv")
-#print(df.shape)
-#df = df[df["pred"].isna()].reset_index(drop=True)
-
-#DIR = "/home/abebe9849/Nploid/src/outputs/2023-01-08/dino_unfreeze1_aug" #n_last_blockが1
-#DIR = "/home/abebe9849/Nploid/src/outputs/2023-02-12/HIPT_unfreeze2_aug_select" 
 DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-12/dino_unfreeze1_aug_select" 
 
 #exit()
@@ -693,23 +436,6 @@ def main(CFG : DictConfig) -> None:
     log.info(f"===============exp_num{CFG.general.exp_num}============")
 
     log.info(f"{DIR}")
-    
-    folds = pd.read_csv("/home/abebe9849/Nploid/all_5folds20230309_v2.csv")
-    
-    folds = pd.read_csv("/home/abebe9849/Nploid/0912_select_5fold_iafoss_1000.csv")
-    #folds = pd.read_csv("/home/abebe9849/Nploid/0912_select_5fold_iafoss_2022_remove_017_053.csv")
-    folds_ = pd.read_csv("/home/abebe9849/Nploid/src/nosiy_.csv")
-    
-    new_fold = dict(zip(folds_["WSI_ID"].values,folds_["fold"].values))
-    def func(x):
-        return new_fold[x]
-    print(folds["WSI_ID"].unique())
-
-    
-    
-    
-    folds["fold"] = folds["WSI_ID"].apply(func)
-    #oof_df.to_csv("oof.csv",index=False)
     
     df_tmp = pd.DataFrame()
     df_tmp["file_path"]=glob.glob("/data/RSNA/Nploid_test/20221216多倍体データ/20221120_MidTIFF/*/*")
@@ -729,28 +455,14 @@ def main(CFG : DictConfig) -> None:
     gt["WSI_ID"]= gt["Pt_No"].apply(func)
     df_tmp = df_tmp[df_tmp["WSI_ID"].isin(gt["WSI_ID"].unique())].reset_index(drop=True)
     
-    #submit_folds(CFG,folds,DIR)
-    
-    df_tmp = pd.read_csv("/home/abebe9849/Nploid/src/outputs/2023-03-12/HIPT_unfreeze1_aug_select/test.csv")
-    #exit()
     
     test_df,embs = submit(CFG,df_tmp,DIR)
 
     test_df.to_csv(f"{DIR}/test.csv",index=False)
-    
-    #for FOLD in range(5):    
-    #    np.save(f"test_{FOLD}_emb.npy",embs[FOLD])
 
     
     tset_g = test_df.groupby("WSI_ID")["pred"].describe().reset_index()
     tset_g.to_csv(f"{DIR}/test_groupby.csv",index=False)
-    
-
-        
-
-
-
-
 
 
 if __name__ == "__main__":
