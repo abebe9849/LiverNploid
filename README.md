@@ -16,9 +16,12 @@ Official implementation of the paper "Selective identification of polyploid hepa
 
 ### pretraining
 
-``` python
-
 ```
+cd dino
+python -m torch.distributed.launch --nproc_per_node=2 main_dino.py --arch vit_small --batch_size_per_gpu 256
+```
+If you experience NaN values in the DINO loss, please set `fp_16` to `False`, and also reduce the value of the gradient clipping.
+
 
 plot KM curve
 
