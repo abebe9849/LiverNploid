@@ -9,6 +9,10 @@ Official implementation of the paper "Selective identification of polyploid hepa
 ### Key points
 
 
+## Requirements
+- **Operating system**: Testing has been performed on Ubuntu 20.04.
+- Python == 3.9
+- PyTorch == 1.12.0
 
 ### pretraining
 
