@@ -23,7 +23,10 @@ python -m torch.distributed.launch --nproc_per_node=2 main_dino.py --arch vit_sm
 If you experience NaN values in the DINO loss, please set `fp_16` to `False`, and also reduce the value of the gradient clipping.
 
 
-plot KM curve
+#### TCGA's data anottation
+preprocess/TCGA_GT.csv 
+
+#### plot KM curve
 
 python preprocess/plot_KM.py
 
