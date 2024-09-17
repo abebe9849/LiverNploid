@@ -23,10 +23,16 @@ python -m torch.distributed.launch --nproc_per_node=2 main_dino.py --arch vit_sm
 If you experience NaN values in the DINO loss, please set `fp_16` to `False`, and also reduce the value of the gradient clipping.
 
 ### train efficeintnet_b0
+
 python src/debugDINO_aug.py
+python src/debug_inf_aug_TGCA.py
 
 ### train efficeintnet_b0_gray
 python src/debug_aug_gray.py
+
+### train dino pretrained model
+python src/debugDINO_aug.py
+python src/debug_inf_aug_DINO_TCGA.py
 
 #### TCGA's data anottation
 preprocess/TCGA_GT.csv 
