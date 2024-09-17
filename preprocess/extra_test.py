@@ -1,8 +1,4 @@
-"""
-20221216に届いたデータについて
 
-
-"""
 import  os,time,glob,cv2
 import collections
 import pandas as pd
@@ -13,7 +9,7 @@ folds_uni =folds["WSI_ID"].unique()
 print(folds.columns)
 
 df = pd.DataFrame()
-df["file_path"]=glob.glob("/data/RSNA/Nploid_test/20221216多倍体データ/20221120_MidTIFF/*/*")
+df["file_path"]=glob.glob("./20221120_MidTIFF/*/*")
 path_  = df["file_path"].values[0]
 def func(x):
     x = x.split("/")[-2].split("_")[2]
