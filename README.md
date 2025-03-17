@@ -35,6 +35,9 @@ python src/debug_aug_gray.py
 python src/debugDINO_aug.py
 python src/debug_inf_aug_DINO_TCGA.py
 
+#### trained weights 
+https://www.kaggle.com/datasets/abebe9849/NploidHIPTunfreeze2augselect 
+
 #### TCGA's data anottation
 preprocess/TCGA_GT.csv 
 
