@@ -220,16 +220,16 @@ class Model_HIPT(nn.Module):
         
         
         checkpoint_key = "teacher"
-        pretrained_weights = "/home/abebe9849/Nploid/dino/vit256_small_dino.pth"
+        #pretrained_weights = "/home/abebe9849/Nploid/dino/vit256_small_dino.pth"
         self.model = vits.__dict__["vit_small"](patch_size=16, num_classes=0)
-        state_dict = torch.load(pretrained_weights, map_location="cpu")
-        print(state_dict.keys())
-        if checkpoint_key is not None and checkpoint_key in state_dict:
-            state_dict = state_dict[checkpoint_key]
-        state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+        #state_dict = torch.load(pretrained_weights, map_location="cpu")
+        #print(state_dict.keys())
+        #if checkpoint_key is not None and checkpoint_key in state_dict:
+        #    state_dict = state_dict[checkpoint_key]
+        #state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
         # remove `backbone.` prefix induced by multicrop wrapper
-        state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
-        self.model.load_state_dict(state_dict, strict=False)
+        #state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
+        #self.model.load_state_dict(state_dict, strict=False)
         
         for _, p in self.model.named_parameters():
             p.requires_grad = False
@@ -276,17 +276,17 @@ class Model_HIPT(nn.Module):
         
         
         checkpoint_key = "teacher"
-        pretrained_weights = "/home/abebe9849/Nploid/dino/vit256_small_dino.pth"
+        #pretrained_weights = "/home/abebe9849/Nploid/dino/vit256_small_dino.pth"
         #pretrained_weights = "/home/abebe9849/Nploid/dino/exp000/checkpoint.pth"
         self.model = vits.__dict__["vit_small"](patch_size=16, num_classes=0)
-        state_dict = torch.load(pretrained_weights, map_location="cpu")
-        print(state_dict.keys())
-        if checkpoint_key is not None and checkpoint_key in state_dict:
-            state_dict = state_dict[checkpoint_key]
-        state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+        #state_dict = torch.load(pretrained_weights, map_location="cpu")
+        #print(state_dict.keys())
+        #if checkpoint_key is not None and checkpoint_key in state_dict:
+        #    state_dict = state_dict[checkpoint_key]
+        #state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
         # remove `backbone.` prefix induced by multicrop wrapper
-        state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
-        self.model.load_state_dict(state_dict, strict=False)
+        #state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
+        #self.model.load_state_dict(state_dict, strict=False)
         
         for _, p in self.model.named_parameters():
             p.requires_grad = False
@@ -478,25 +478,27 @@ def main(CFG : DictConfig) -> None:
 
     log.info(f"{DIR}")
     
-    df_tmp = pd.DataFrame()
-    df_tmp["file_path"]=glob.glob("/data/RSNA/Nploid_test/20221216多倍体データ/20221120_MidTIFF/*/*")
+    #df_tmp = pd.DataFrame()
+    #df_tmp["file_path"]=glob.glob("/data/RSNA/Nploid_test/20221216多倍体データ/20221120_MidTIFF/*/*")
 
-    path_  = df_tmp["file_path"].values[0]
+    #path_  = df_tmp["file_path"].values[0]
     def func(x):
         x = x.split("/")[-2].split("_")[2]
         return "AI"+x
-    df_tmp["WSI_ID"]= np.vectorize(func)(df_tmp["file_path"])
+    #df_tmp["WSI_ID"]= np.vectorize(func)(df_tmp["file_path"])
 
 
 
-    df_tmp = df_tmp[~df_tmp["WSI_ID"].isin(folds["WSI_ID"].unique())].reset_index(drop=True)
-    gt = pd.read_csv("/home/abebe9849/Nploid/20230224_WGDbyFISH_pred_final.csv")
-    def func(x):
-        return "AI"+x[2:]
-    gt["WSI_ID"]= gt["Pt_No"].apply(func)
-    df_tmp = df_tmp[df_tmp["WSI_ID"].isin(gt["WSI_ID"].unique())].reset_index(drop=True)
+    #df_tmp = df_tmp[~df_tmp["WSI_ID"].isin(folds["WSI_ID"].unique())].reset_index(drop=True)
+    #gt = pd.read_csv("/home/abebe9849/Nploid/20230224_WGDbyFISH_pred_final.csv")
+    #def func(x):
+    #    return "AI"+x[2:]
+    #gt["WSI_ID"]= gt["Pt_No"].apply(func)
+    #df_tmp = df_tmp[df_tmp["WSI_ID"].isin(gt["WSI_ID"].unique())].reset_index(drop=True)
     
     #df_tmp: file_pathの列があるdataframeならなんでもよい　file_pathはtifファイルの絶対path
+    df_tmp = pd.DataFrame()
+    df_tmp["file_path"]=glob.glob("~~/*/*tif")
     test_df,embs = submit(CFG,df_tmp,DIR)
 
     test_df.to_csv(f"{DIR}/test.csv",index=False)
