@@ -33,11 +33,58 @@ import vision_transformer as vits
 
 
 ### my utils
-from code_factory.pooling import GeM,AdaptiveConcatPool2d
-from code_factory.augmix import RandomAugMix
-from code_factory.gridmask import GridMask
-from code_factory.fmix import *
-from code_factory.loss_func import *
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from torch.nn import AdaptiveAvgPool2d, AdaptiveMaxPool2d
+
+
+# From: https://github.com/filipradenovic/cnnimageretrieval-pytorch/blob/master/cirtorch/layers/pooling.py
+def gem_1d(x, p=3, eps=1e-6):
+    return F.avg_pool1d(x.clamp(min=eps).pow(p), (x.size(-1),)).pow(1./p)
+
+
+def gem_2d(x, p=3, eps=1e-6):
+    return F.avg_pool2d(x.clamp(min=eps).pow(p), (x.size(-2), x.size(-1))).pow(1./p)
+
+
+def gem_3d(x, p=3, eps=1e-6):
+    return F.avg_pool3d(x.clamp(min=eps).pow(p), (x.size(-3), x.size(-2), x.size(-1))).pow(1./p)
+
+
+_GEM_FN = {
+    1: gem_1d, 2: gem_2d, 3: gem_3d
+}
+
+
+class GeM(nn.Module):
+
+    def __init__(self, p=3, eps=1e-6, dim=2):
+        super().__init__()
+        self.p = nn.Parameter(torch.ones(1)*p)
+        self.eps = eps
+        self.dim = dim
+
+    def forward(self, x):
+        return _GEM_FN[self.dim](x, p=self.p, eps=self.eps)
+
+class AdaptiveConcatPool1d(nn.Module):
+
+    def forward(self, x):
+        return torch.cat((F.adaptive_avg_pool1d(x, 1), F.adaptive_max_pool1d(x, 1)), dim=1)
+
+
+class AdaptiveConcatPool2d(nn.Module):
+
+    def forward(self, x):
+        return torch.cat((F.adaptive_avg_pool2d(x, 1), F.adaptive_max_pool2d(x, 1)), dim=1)
+
+
+class AdaptiveConcatPool3d(nn.Module):
+
+    def forward(self, x):
+        return torch.cat((F.adaptive_avg_pool3d(x, 1), F.adaptive_max_pool3d(x, 1)), dim=1)
 
 ###
 
@@ -147,8 +194,6 @@ def get_transforms(*, data,CFG):
                 A.JpegCompression(),
                 A.Downscale(scale_min=0.1, scale_max=0.15),
                 ], p=CFG.aug.compress.p),
-            GridMask(
-                num_grid=CFG.aug.GridMask.num_grid,p=CFG.aug.GridMask.p),
             A.CoarseDropout(max_holes=CFG.aug.CoarseDropout.max_holes, max_height=CFG.aug.CoarseDropout.max_height, max_width=CFG.aug.CoarseDropout.max_width, p=CFG.aug.CoarseDropout.p),
             Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
             ])
@@ -361,10 +406,8 @@ def submit(CFG,test,DIR):
     models = []
     for fold in   range(5):
         model = Model_HIPT(base_model="dino_vit_s",freeze=1).to(device)
-        #if i==3:continue #AI049
         model.load_state_dict(torch.load(f"{DIR}/fold{fold}_{CFG.general.exp_num}__dino_best_AUC.pth", map_location="cpu"),strict=False)
 
-        #model.load_state_dict(torch.load(f"{DIR}/fold{i}_nosiy___HIPT_best_AUC.pth", map_location="cpu"),strict=False)
         models.append(model)
         
     valid_dataset = TestDataset(test,train=False,
@@ -393,7 +436,6 @@ def submit_folds(CFG,folds,DIR):
         
         val_ID = folds["WSI_ID"].unique()
         model = Model_HIPT(base_model="dino_vit_s",freeze=1).to(device)
-        #if i==3:continue #AI049
         model.load_state_dict(torch.load(f"{DIR}/fold{fold}_{CFG.general.exp_num}__HIPT_best_AUC.pth", map_location="cpu"),strict=False)
         
         val_folds = folds_all[folds_all["WSI_ID"].isin(val_ID)].reset_index(drop=True)
@@ -424,7 +466,6 @@ df["WSI_ID"]= np.vectorize(func)(df["file_path"])
 
 DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-12/dino_unfreeze1_aug_select" 
 
-#exit()
 
 log = logging.getLogger(__name__)
 @hydra.main(config_path=f"{DIR}/.hydra/",config_name="config")
