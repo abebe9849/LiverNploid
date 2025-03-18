@@ -406,6 +406,7 @@ def submit(CFG,test,DIR):
     models = []
     for fold in   range(5):
         model = Model_HIPT(base_model="dino_vit_s",freeze=1).to(device)
+        #https://www.kaggle.com/datasets/abebe9849/nploidhiptunfreeze2augselect のfold{fold}_HIPT_unfreeze2_aug__HIPT_best_AUC.pthに書き換え
         model.load_state_dict(torch.load(f"{DIR}/fold{fold}_{CFG.general.exp_num}__dino_best_AUC.pth", map_location="cpu"),strict=False)
 
         models.append(model)
@@ -466,9 +467,8 @@ df["WSI_ID"]= np.vectorize(func)(df["file_path"])
 
 DIR = "/home/abebe9849/Nploid/src/outputs/2023-03-12/dino_unfreeze1_aug_select" 
 
-
 log = logging.getLogger(__name__)
-@hydra.main(config_path=f"{DIR}/.hydra/",config_name="config")
+@hydra.main(config_path=f"{LiverNploid}/config/",config_name="HIPT_unfreeze2_aug")
 def main(CFG : DictConfig) -> None:
 
     seed_torch(seed=CFG.general.seed)
@@ -496,7 +496,7 @@ def main(CFG : DictConfig) -> None:
     gt["WSI_ID"]= gt["Pt_No"].apply(func)
     df_tmp = df_tmp[df_tmp["WSI_ID"].isin(gt["WSI_ID"].unique())].reset_index(drop=True)
     
-    
+    #df_tmp: file_pathの列があるdataframeならなんでもよい　file_pathはtifファイルの絶対path
     test_df,embs = submit(CFG,df_tmp,DIR)
 
     test_df.to_csv(f"{DIR}/test.csv",index=False)
