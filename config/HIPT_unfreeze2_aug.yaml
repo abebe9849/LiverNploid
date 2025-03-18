@@ -1,0 +1,73 @@
+general:
+  debug: false
+  exp_num: HIPT_unfreeze2_aug
+  device: 1
+  seed: 42
+  num_folds: 5
+loss:
+  name: bce
+preprocess:
+  size: 256
+aug:
+  HorizontalFlip:
+    p: 0.5
+  VerticalFlip:
+    p: 0.5
+  RandomRotate90:
+    p: 0.5
+  ShiftScaleRotate:
+    p: 0
+    shift_limit: 0.1
+    scale_limit: 0.1
+    rotate_limit: 15
+  RandomBrightnessContrast:
+    p: 0.5
+    brightness_limit: 0.1
+    contrast_limit: 0.1
+  CLAHE:
+    p: 0
+  one_of_Distortion:
+    p: 0
+  one_of_Blur_Gnoise:
+    p: 0
+  GridMask:
+    p: 0
+    num_grid: 2
+  compress:
+    p: 0
+  CoarseDropout:
+    p: 0.5
+    max_holes: 4
+    max_height: 6
+    max_width: 6
+augmentation:
+  do_mixup: false
+  do_fmix: false
+  do_cutmix: false
+  do_resizemix: false
+  mix_p: 0
+  mix_alpha: 1
+model:
+  name: HIPT
+  pooling: gem
+  n_classes: 1
+  features_num: 1280
+  drop_rate: 0.1
+  drop_path_rate: 0.1
+  stride: 2
+  freeze: 2
+psuedo_label: 0
+train:
+  amp: true
+  amp_inf: false
+  optim: adamw
+  lr: 0.001
+  epochs: 10
+  without_hesitate: 15
+  batch_size: 4
+  ga_accum: 1
+  scheduler:
+    name: cosine_warmup
+    min_lr: 1.0e-07
+    t_0: 3
+    warmup: 3
